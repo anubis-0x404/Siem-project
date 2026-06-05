@@ -1,0 +1,51 @@
+Jun  2 13:19:02 Server gdm-launch-environment]: pam_unix(gdm-launch-environment:session): session opened for user gdm(uid=128) by (uid=0)
+Jun  2 13:19:02 Server systemd-logind[754]: New session c1 of user gdm.
+Jun  2 13:19:03 Server systemd: pam_unix(systemd-user:session): session opened for user gdm(uid=128) by (uid=0)
+Jun  2 13:19:12 Server polkitd(authority=local): Registered Authentication Agent for unix-session:c1 (system bus name :1.41 [/usr/bin/gnome-shell], object path /org/freedesktop/PolicyKit1/AuthenticationAgent, locale en_US.UTF-8)
+Jun  2 13:19:21 Server gdm-password]: gkr-pam: unable to locate daemon control file
+Jun  2 13:19:21 Server gdm-password]: gkr-pam: stashed password to try later in open session
+Jun  2 13:19:21 Server gdm-password]: pam_unix(gdm-password:session): session opened for user trung(uid=1000) by (uid=0)
+Jun  2 13:19:21 Server systemd-logind[754]: New session 2 of user trung.
+Jun  2 13:19:21 Server systemd: pam_unix(systemd-user:session): session opened for user trung(uid=1000) by (uid=0)
+Jun  2 13:19:21 Server gdm-password]: gkr-pam: gnome-keyring-daemon started properly and unlocked keyring
+Jun  2 13:19:22 Server gnome-keyring-daemon[1467]: The Secret Service was already initialized
+Jun  2 13:19:22 Server gnome-keyring-daemon[1467]: The PKCS#11 component was already initialized
+Jun  2 13:19:22 Server gnome-keyring-daemon[1467]: The SSH agent was already initialized
+Jun  2 13:19:25 Server polkitd(authority=local): Registered Authentication Agent for unix-session:2 (system bus name :1.76 [/usr/bin/gnome-shell], object path /org/freedesktop/PolicyKit1/AuthenticationAgent, locale en_US.UTF-8)
+Jun  2 13:17:33 Server dbus-daemon[701]: [system] Failed to activate service 'org.bluez': timed out (service_start_timeout=25000ms)
+Jun  2 13:17:36 Server gdm-launch-environment]: pam_unix(gdm-launch-environment:session): session closed for user gdm
+Jun  2 13:17:36 Server systemd-logind[754]: Session c1 logged out. Waiting for processes to exit.
+Jun  2 13:17:36 Server systemd-logind[754]: Removed session c1.
+Jun  2 13:17:37 Server polkitd(authority=local): Unregistered Authentication Agent for unix-session:c1 (system bus name :1.41, object path /org/freedesktop/PolicyKit1/AuthenticationAgent, locale en_US.UTF-8) (disconnected from bus)
+Jun  2 13:18:39 Server pkexec: pam_unix(polkit-1:session): session opened for user root(uid=0) by (uid=1000)
+Jun  2 13:18:39 Server pkexec[2348]: trung: Executing command [USER=root] [TTY=unknown] [CWD=/home/trung] [COMMAND=/usr/lib/update-notifier/package-system-locked]
+Jun  2 13:22:49 Server sudo:    trung : TTY=pts/0 ; PWD=/home/trung ; USER=root ; COMMAND=/usr/bin/apt update
+Jun  2 13:22:49 Server sudo: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
+Jun  2 13:24:10 Server sudo: pam_unix(sudo:session): session closed for user root
+Jun  2 13:24:10 Server sudo:    trung : TTY=pts/0 ; PWD=/home/trung ; USER=root ; COMMAND=/usr/bin/apt install -y cloud-guest-utils
+Jun  2 13:24:10 Server sudo: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
+Jun  2 13:24:45 Server pkexec: pam_unix(polkit-1:session): session opened for user root(uid=0) by (uid=1000)
+Jun  2 13:24:45 Server pkexec[3444]: trung: Executing command [USER=root] [TTY=unknown] [CWD=/home/trung] [COMMAND=/usr/lib/update-notifier/package-system-locked]
+Jun  2 13:26:37 Server sudo: pam_unix(sudo:session): session closed for user root
+Jun  2 13:30:01 Server CRON[3566]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+Jun  2 13:30:01 Server CRON[3566]: pam_unix(cron:session): session closed for user root
+Jun  2 13:31:39 Server sudo:    trung : TTY=pts/0 ; PWD=/home/trung ; USER=root ; COMMAND=/usr/bin/apt install -y cloud-guest-utils
+Jun  2 13:31:39 Server sudo: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
+Jun  2 13:31:55 Server sudo: pam_unix(sudo:session): session closed for user root
+Jun  2 13:32:15 Server sudo:    trung : TTY=pts/0 ; PWD=/home/trung ; USER=root ; COMMAND=/usr/sbin/fdisk -l /dev/sda
+Jun  2 13:32:15 Server sudo: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
+Jun  2 13:32:15 Server sudo: pam_unix(sudo:session): session closed for user root
+Jun  2 13:33:14 Server sudo:    trung : TTY=pts/0 ; PWD=/home/trung ; USER=root ; COMMAND=/usr/sbin/fdisk /dev/sda
+Jun  2 13:33:14 Server sudo: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
+Jun  2 13:38:06 Server sudo: pam_unix(sudo:session): session closed for user root
+Jun  2 13:38:20 Server sudo:    trung : TTY=pts/0 ; PWD=/home/trung ; USER=root ; COMMAND=/usr/sbin/partprobe /dev/sda
+Jun  2 13:38:20 Server sudo: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
+Jun  2 13:38:20 Server sudo: pam_unix(sudo:session): session closed for user root
+Jun  2 13:38:29 Server sudo:    trung : TTY=pts/0 ; PWD=/home/trung ; USER=root ; COMMAND=/usr/sbin/resize2fs /dev/sda3
+Jun  2 13:38:29 Server sudo: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
+Jun  2 13:38:30 Server sudo: pam_unix(sudo:session): session closed for user root
+Jun  2 13:39:15 Server gnome-keyring-daemon[1467]: asked to register item /org/freedesktop/secrets/collection/login/1, but it's already registered
+Jun  2 13:39:17 Server dbus-daemon[701]: [system] Failed to activate service 'org.bluez': timed out (service_start_timeout=25000ms)
+Jun  2 13:56:33 Server gdm-password]: gkr-pam: unlocked login keyring
+Jun  2 13:57:05 Server sudo:    trung : TTY=pts/0 ; PWD=/home/trung ; USER=root ; COMMAND=/usr/bin/cp /var/log/auth.log /home/trung/siem_project/logs/sample/auth.log
+Jun  2 13:57:05 Server sudo: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
