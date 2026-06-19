@@ -16,9 +16,6 @@ load_dotenv()
 
 TELEGRAM_TOKEN   = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
-EMAIL_SENDER     = os.getenv("EMAIL_SENDER", "")
-EMAIL_PASSWORD   = os.getenv("EMAIL_PASSWORD", "")
-EMAIL_RECEIVER   = os.getenv("EMAIL_RECEIVER", "")
 
 SEVERITY_EMOJI = {
     "CRITICAL": "🔴",
@@ -79,50 +76,6 @@ def send_telegram(alert: dict) -> bool:
         print(f"[ERROR] Telegram: {e}")
         return False
 
-def send_email(alert: dict) -> bool:
-    if not EMAIL_SENDER or not EMAIL_PASSWORD:
-        print("[WARN] Email chua cau hinh trong .env")
-        return False
-
-    severity = alert.get("alert.severity", "")
-    if severity != "CRITICAL":
-        return False
-
-    try:
-        subject = (f"[SIEM CRITICAL] {alert.get('alert.type', 'Alert')} "
-                   f"tu {alert.get('source.ip', 'Unknown')}")
-
-        body = (
-            f"SIEM MINI — CANH BAO NGHIEM TRONG\n"
-            f"{'='*50}\n\n"
-            f"Loai tan cong : {alert.get('alert.type')}\n"
-            f"IP nguon      : {alert.get('source.ip')}\n"
-            f"Muc do        : {severity}\n"
-            f"Thoi gian     : {alert.get('@timestamp')}\n"
-            f"Mo ta         : {alert.get('alert.description')}\n\n"
-            f"Chi tiet      :\n{json.dumps(alert, indent=2, ensure_ascii=False)}"
-        )
-
-        msg = MIMEMultipart()
-        msg["From"]    = EMAIL_SENDER
-        msg["To"]      = EMAIL_RECEIVER
-        msg["Subject"] = subject
-        msg.attach(MIMEText(body, "plain", "utf-8"))
-
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.starttls()
-            server.login(EMAIL_SENDER, EMAIL_PASSWORD)
-            server.send_message(msg)
-
-        print(f"[+] Email: Da gui CRITICAL alert den {EMAIL_RECEIVER}")
-        return True
-
-    except smtplib.SMTPAuthenticationError:
-        print("[ERROR] Email: Sai tai khoan hoac App Password")
-        return False
-    except Exception as e:
-        print(f"[ERROR] Email: {e}")
-        return False
 
 def send_alert(alert: dict) -> None:
     severity = alert.get("alert.severity", "")
@@ -131,7 +84,6 @@ def send_alert(alert: dict) -> None:
 
     if severity == "CRITICAL":
         send_telegram(alert)
-        send_email(alert)
 
     elif severity == "HIGH":
         send_telegram(alert)
@@ -184,7 +136,7 @@ def watch_new_alerts(es: Elasticsearch,
 if __name__ == "__main__":
     from config.settings import ES_HOST
 
-    print("[*] Test gui Telegram...")
+    print("[*] Canh bao gui ve Telegram...")
     test_alert = {
         "@timestamp":        datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         "alert.type":        "SSH Brute Force",

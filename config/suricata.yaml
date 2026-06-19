@@ -1,0 +1,9 @@
+suricata:
+  eve_json_path: "/var/log/suricata/eve.json"
+  alert_event_type: "alert"
+severity_map:
+  1: CRITICAL
+  2: HIGH
+  3: MEDIUM
+  4: LOW
+

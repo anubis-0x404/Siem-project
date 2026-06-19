@@ -2,13 +2,7 @@ import json
 import sys
 import os
 from datetime import datetime
-
-SEVERITY_MAP = {
-    1: "CRITICAL",
-    2: "HIGH",
-    3: "MEDIUM",
-    4: "LOW",
-}
+from config.settings import SEVERITY_MAP, EVE_JSON_PATH
 
 def normalize_timestamp(raw_time: str) -> str:
     try:
@@ -73,7 +67,6 @@ def parse_eve_json(filepath: str) -> list[dict]:
 
 if __name__ == "__main__":
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from config.settings import EVE_JSON_PATH
     log_path = sys.argv[1] if len(sys.argv) > 1 else EVE_JSON_PATH
     print(f"[*] Đang parse file: {log_path}")
     events = parse_eve_json(log_path)

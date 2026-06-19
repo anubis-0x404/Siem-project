@@ -47,9 +47,9 @@ def normalize_auth_event(raw: dict) -> dict:
         "event.type":           event_type,
 
         # Mạng
-        "source.ip":            raw.get("src_ip",   ""),
+        "source.ip":            raw.get("src_ip", None),
         "source.port":          raw.get("src_port",  0),
-        "destination.ip":       "",
+        "destination.ip":       None,
         "destination.port":     22,
         "network.protocol":     "ssh",
 
@@ -80,9 +80,9 @@ def normalize_suricata_event(raw: dict) -> dict:
         "event.type":           "suricata_alert",
 
         # Mạng
-        "source.ip":            raw.get("src_ip",    ""),
+        "source.ip":            raw.get("src_ip", None),
         "source.port":          raw.get("src_port",   0),
-        "destination.ip":       raw.get("dest_ip",   ""),
+        "destination.ip":       raw.get("dest_ip", None),
         "destination.port":     raw.get("dest_port",  0),
         "network.protocol":     raw.get("proto",     "").lower(),
 
@@ -104,13 +104,18 @@ def normalize(raw: dict) -> dict | None:
     if not raw:
         return None
     event_type = raw.get("event_type", "")
+    
+    normalized_doc = None
     if event_type in ("failed_password", "accepted_password", "invalid_user"):
-        return normalize_auth_event(raw)
-
+        normalized_doc = normalize_auth_event(raw)
     elif event_type == "suricata_alert":
-        return normalize_suricata_event(raw)
-    else:
-        return None
+        normalized_doc = normalize_suricata_event(raw)
+        
+    if normalized_doc:
+        cleaned_doc = {k: (None if v == "" else v) for k, v in normalized_doc.items()}
+        return cleaned_doc
+        
+    return None
 
 if __name__ == "__main__":
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
