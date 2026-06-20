@@ -10,7 +10,7 @@ from config.settings import ES_HOST, ES_INDEX_PREFIX, CORRELATION_WINDOW
 from module4_detection.rule_based  import run_all_rules
 from module4_detection.correlation import run_correlation, get_active_ips
 from module5_dashboard.alert_sender import send_alert
-
+from module3_storage.es_client import ingest_new_logs, ensure_template_exists
 #Luu alert vao Elasticsearch
 def save_alert(es: Elasticsearch, alert: dict) -> bool:
     try:
@@ -29,9 +29,13 @@ def run_detection_cycle(es: Elasticsearch) -> None:
     print(f"\n{'='*55}")
     print(f"[{now}] Bat dau chu ky detection")
     print(f"{'='*55}")
+
+    ingested = ingest_new_logs(es)
+    if ingested:
+        print(f"[*] Da nap {ingested} document moi vao Elasticsearch")
+
     minutes     = CORRELATION_WINDOW // 60
     active_ips  = get_active_ips(es, minutes=minutes)
-
     if not active_ips:
         print("[*] Khong co IP nao dang hoat dong")
         return
@@ -104,10 +108,15 @@ if __name__ == "__main__":
         print(f"[INFO] Kiem tra ES dang chay tai: {ES_HOST}")
         sys.exit(1)
 
-    print("[*] Ket noi Elasticsearch thanh cong\n")
+    print("[*] Ket noi Elasticsearch thanh cong")
 
-    # --schedule → chay lien tuc; khong co flag → chay 1 lan
+    if not ensure_template_exists(es):
+        print("[ERROR] Khong dam bao duoc index template, dung lai "
+              "de tranh tao index voi mapping sai (source.ip = text).")
+        sys.exit(1)
+    print("[*] Index template OK\n")
+
     if "--schedule" in sys.argv:
         run_scheduled(es, interval_seconds=30)
     else:
-        run_once(es) # type: ignore
+        run_once(es)

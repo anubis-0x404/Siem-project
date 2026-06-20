@@ -95,6 +95,32 @@ def bulk_index_documents(es: Elasticsearch,
         print(f"[ERROR] Bulk index thất bại: {e}")
         return 0, len(documents)
 
+# ── Nạp log mới phát sinh — gọi LIÊN TỤC mỗi chu kỳ detection ──
+# ── Nạp log mới phát sinh — gọi LIÊN TỤC mỗi chu kỳ detection ──
+def ingest_new_logs(es: Elasticsearch) -> int:
+    # Đổi import sang các hàm parser cơ bản đang có sẵn
+    from module2_parser.auth_parser     import parse_auth_log
+    from module2_parser.suricata_parser import parse_eve_json
+    from module2_parser.normalizer      import normalize
+    from config.settings import AUTH_LOG_PATH, EVE_JSON_PATH
+
+    # Sử dụng các hàm cơ bản
+    auth_raw = parse_auth_log(AUTH_LOG_PATH)
+    suri_raw = parse_eve_json(EVE_JSON_PATH)
+
+    new_docs = [normalize(r) for r in (auth_raw + suri_raw) if normalize(r)]
+
+    if not new_docs:
+        return 0
+
+    success, failed = bulk_index_documents(es, new_docs)
+    if success:
+        print(f"  [INGEST] +{success} document mới "
+              f"(auth: {len(auth_raw)}, suricata: {len(suri_raw)})")
+    if failed:
+        print(f"  [WARN] {failed} document lưu thất bại khi ingest")
+
+    return success
 #Truy van event trong khoang tgian
 def query_recent_events(es: Elasticsearch,
                          src_ip: str = None,

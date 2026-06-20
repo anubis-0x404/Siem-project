@@ -7,7 +7,8 @@ from elasticsearch import Elasticsearch
 from config.settings import (
     ES_INDEX_PREFIX,
     CORRELATION_WINDOW,
-    BRUTE_FORCE_THRESHOLD,   
+    BRUTE_FORCE_THRESHOLD,
+    PORT_SCAN_THRESHOLD,    
 )
 from module4_detection.rule_based import create_alert
 
@@ -60,33 +61,48 @@ def get_active_ips(es: Elasticsearch,
 def check_step_port_scan(es: Elasticsearch,
                           src_ip: str,
                           minutes: int) -> bool:
-    query = {
+    # Điều kiện 1: Suricata đã cảnh báo có "SCAN" trong rule.name
+    # (field đúng là rule.name — KHÔNG phải alert.signature như bản cũ)
+    signature_query = {
         "query": {
             "bool": {
                 "must": [
                     {"term":  {"source.ip": src_ip}},
-                    {"range": {"@timestamp": {
-                        "gte": f"now-{minutes}m"
-                    }}},
+                    {"range": {"@timestamp": {"gte": f"now-{minutes}m"}}},
                 ],
-                # FIX: wildcard thay vì match_phrase
                 "should": [
-                    {"wildcard": {"rule.name":          "*SCAN*"}},
-                    {"wildcard": {"rule.name":          "*scan*"}},
-                    {"wildcard": {"alert.signature":    "*scan*"}},
-                    {"term":     {"event.category": "network_scan"}},
+                    {"wildcard": {"rule.name": "*SCAN*"}},
+                    {"wildcard": {"rule.name": "*Scan*"}},
                 ],
-                "minimum_should_match": 1   # Ít nhất 1 điều kiện should đúng
+                "minimum_should_match": 1
             }
         }
     }
-
     try:
-        count = es.count(
-            index=f"{ES_INDEX_PREFIX}-*",
-            body=query
-        )["count"]
-        return count > 0
+        count = es.count(index=f"{ES_INDEX_PREFIX}-*", body=signature_query)["count"]
+        if count > 0:
+            return True
+    except Exception:
+        pass
+
+    # Điều kiện 2 (fallback): đếm số cổng đích khác nhau — kích hoạt
+    # khi Suricata không có rule nào chứa chữ "SCAN" trong tên
+    port_query = {
+        "query": {
+            "bool": {
+                "must": [
+                    {"term":  {"source.ip": src_ip}},
+                    {"range": {"@timestamp": {"gte": f"now-{minutes}m"}}},
+                ]
+            }
+        },
+        "aggs": {"unique_ports": {"cardinality": {"field": "destination.port"}}},
+        "size": 0
+    }
+    try:
+        resp = es.search(index=f"{ES_INDEX_PREFIX}-*", body=port_query)
+        unique_ports = resp["aggregations"]["unique_ports"]["value"]
+        return unique_ports >= PORT_SCAN_THRESHOLD
     except Exception:
         return False
     

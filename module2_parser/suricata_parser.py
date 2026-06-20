@@ -65,6 +65,29 @@ def parse_eve_json(filepath: str) -> list[dict]:
         print(f"[ERROR] Không có quyền đọc file: {filepath}")
     return results
 
+_file_offsets: dict = {}
+
+def parse_auth_log_incremental(filepath: str) -> list[dict]:
+    results = []
+    try:
+        current_size = os.path.getsize(filepath)
+        last_offset  = _file_offsets.get(filepath, 0)
+        if current_size < last_offset:
+            last_offset = 0
+
+        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+            f.seek(last_offset)
+            for line in f:
+                parsed = parse_line(line)
+                if parsed:
+                    results.append(parsed)
+            _file_offsets[filepath] = f.tell()
+
+    except FileNotFoundError:
+        print(f"[ERROR] Không tìm thấy file: {filepath}")
+    except PermissionError:
+        print(f"[ERROR] Không có quyền đọc file: {filepath}")
+
 if __name__ == "__main__":
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     log_path = sys.argv[1] if len(sys.argv) > 1 else EVE_JSON_PATH
