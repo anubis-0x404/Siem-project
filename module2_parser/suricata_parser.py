@@ -1,16 +1,24 @@
 import json
 import sys
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 from config.settings import SEVERITY_MAP, EVE_JSON_PATH
-
+from dateutil import parser as date_parser
 def normalize_timestamp(raw_time: str) -> str:
     try:
-        dt = datetime.fromisoformat(raw_time)
-        dt_utc = dt.astimezone(timezone.utc)
-        return dt_utc.strftime("%Y-%m-%dT%H:%M:%S")
+        raw_time = raw_time.strip()
+        if raw_time[0].isdigit():
+            dt = date_parser.parse(raw_time)
+        else:
+            current_year = datetime.now().year
+            full_time = f"{raw_time} {current_year}"
+            dt = date_parser.parse(full_time)
+        if dt > datetime.now() + timedelta(days=7):
+            dt = dt.replace(year=datetime.now().year - 1)
+        return dt.strftime("%Y-%m-%dT%H:%M:%S")
     except Exception:
-        return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+        return datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
 
 def parse_line(line: str) -> dict | None:
     original = line              

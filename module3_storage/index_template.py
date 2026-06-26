@@ -5,7 +5,7 @@ from elasticsearch import Elasticsearch
 from config.settings import ES_HOST, ES_INDEX_PREFIX
 
 TEMPLATE_BODY = {
-    "index_patterns": [f"{ES_INDEX_PREFIX}-*"],   # khớp đúng prefix dùng trong storage.py (siem-logs-*)
+    "index_patterns": [f"{ES_INDEX_PREFIX}-*"],   
     "priority": 1,
     "template": {
         "settings": {
@@ -75,7 +75,6 @@ TEMPLATE_BODY = {
 }
 
 def create_index_template(es: Elasticsearch) -> bool:
-    """Tạo (hoặc cập nhật) index template trên Elasticsearch."""
     try:
         existed_before = es.indices.exists_index_template(name="logs-template").body
 
@@ -87,7 +86,7 @@ def create_index_template(es: Elasticsearch) -> bool:
         )
 
         if existed_before:
-            print("[+] Cập nhật index template thành công (template đã tồn tại trước đó)")
+            print("[+] Cập nhật index template thành công")
         else:
             print("[+] Tạo index template mới thành công")
         return True
