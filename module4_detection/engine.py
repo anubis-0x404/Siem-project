@@ -1,122 +1,151 @@
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import time
-import schedule
-from datetime import datetime
+import signal
+import argparse
+import logging
+from datetime import datetime, timezone
 from elasticsearch import Elasticsearch
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.settings import ES_HOST, ES_INDEX_PREFIX, CORRELATION_WINDOW
-from module4_detection.rule_based  import run_all_rules
+from module4_detection.rule_based import run_all_rules
 from module4_detection.correlation import run_correlation, get_active_ips
 from module5_dashboard.alert_sender import send_alert
 from module3_storage.es_client import ingest_new_logs, ensure_template_exists
-#Luu alert vao Elasticsearch
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger("SIEM-Engine")
+
+is_running = True
+
+def handle_shutdown_signal(signum, frame):
+    global is_running
+    logger.info(f"Nhận tín hiệu dừng hệ thống (Signal: {signum}). Đang dọn dẹp và thoát...")
+    is_running = False
+
+signal.signal(signal.SIGINT, handle_shutdown_signal)
+signal.signal(signal.SIGTERM, handle_shutdown_signal)
+
 def save_alert(es: Elasticsearch, alert: dict) -> bool:
     try:
-        date  = datetime.now().strftime("%Y.%m.%d")
+        date = datetime.now(timezone.utc).strftime("%Y.%m.%d")
         index = f"siem-alerts-{date}"
         es.index(index=index, document=alert)
         send_alert(alert)
         return True
     except Exception as e:
-        print(f"  [ERROR] Luu alert that bai: {e}")
+        logger.error(f"Lưu alert thất bại cho IP {alert.get('source.ip')}: {e}")
         return False
 
-#1 chu ky hoan chinh
 def run_detection_cycle(es: Elasticsearch) -> None:
-    now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-    print(f"\n{'='*55}")
-    print(f"[{now}] Bat dau chu ky detection")
-    print(f"{'='*55}")
+    logger.info("-" * 50)
+    logger.info("BẮT ĐẦU CHU KỲ PHÁT HIỆN")
+    logger.info("-" * 50)
 
-    ingested = ingest_new_logs(es)
-    if ingested:
-        print(f"[*] Da nap {ingested} document moi vao Elasticsearch")
+    try:
+        ingested = ingest_new_logs(es)
+        if ingested:
+            logger.info(f"Đã nạp {ingested} log mới vào Elasticsearch.")
+    except Exception as e:
+        logger.error(f"Lỗi khi nạp log mới (ingest_new_logs): {e}")
 
-    minutes     = CORRELATION_WINDOW // 60
-    active_ips  = get_active_ips(es, minutes=minutes)
-    if not active_ips:
-        print("[*] Khong co IP nao dang hoat dong")
+    minutes = CORRELATION_WINDOW // 60
+    try:
+        active_ips = get_active_ips(es, minutes=minutes)
+    except Exception as e:
+        logger.error(f"Không thể lấy danh sách IP hoạt động: {e}")
         return
 
-    print(f"[*] Phat hien {len(active_ips)} IP dang hoat dong:")
-    for ip in active_ips:
-        print(f"    • {ip}")
+    if not active_ips:
+        logger.info("Không ghi nhận IP nào hoạt động trong Window thời gian.")
+        return
 
-    #Lop 1: Rule-based (single event detection)
-    print(f"\n[→] Chay Rule-based engine...")
-    rule_alerts = run_all_rules(es, active_ips)
+    logger.info(f"Phát hiện {len(active_ips)} IP đang tương tác: {', '.join(active_ips)}")
 
-    saved_rule = 0
-    for alert in rule_alerts:
-        if save_alert(es, alert):
-            saved_rule += 1
+    logger.info("Khởi chạy: Rule-based Engine...")
+    try:
+        rule_alerts = run_all_rules(es, active_ips)
+        saved_rule = 0
+        for alert in rule_alerts:
+            if save_alert(es, alert):
+                saved_rule += 1
+        logger.info(f"[Kết quả] Rule-based: Tạo {len(rule_alerts)} alert, lưu thành công {saved_rule}.")
+    except Exception as e:
+        logger.error(f"Lỗi tại Rule-based: {e}")
+        saved_rule = 0
+        rule_alerts = []
 
-    print(f"[✓] Rule-based: {len(rule_alerts)} alert, "
-          f"{saved_rule} luu thanh cong")
-    
-    #Lop 2: Correlation (multi-event chain detection)
-    print(f"\n[→] Chay Correlation engine...")
-    corr_alerts = run_correlation(es, active_ips)
+    logger.info("Khởi chạy: Correlation Engine...")
+    try:
+        corr_alerts = run_correlation(es, active_ips)
+        saved_corr = 0
+        for alert in corr_alerts:
+            if save_alert(es, alert):
+                saved_corr += 1
+        logger.info(f"[Kết quả] Correlation: Tạo {len(corr_alerts)} alert, lưu thành công {saved_corr}.")
+    except Exception as e:
+        logger.error(f"Lỗi tại Correlation: {e}")
+        saved_corr = 0
+        corr_alerts = []
 
-    saved_corr = 0
-    for alert in corr_alerts:
-        if save_alert(es, alert):
-            saved_corr += 1
-
-    print(f"[✓] Correlation: {len(corr_alerts)} alert, "
-          f"{saved_corr} luu thanh cong")
-
-    # ④ Tong ket chu ky
     total_saved = saved_rule + saved_corr
-    print(f"\n[+] Chu ky hoan thanh: "
-          f"{saved_rule} rule + {saved_corr} correlation = "
-          f"{total_saved} alert da luu vao siem-alerts-*")
-#chay 1 lan
+    logger.info(f"Tổng số alert đã ghi nhận: {total_saved}")
+
 def run_once(es: Elasticsearch) -> None:
     run_detection_cycle(es)
 
-#Chay
 def run_scheduled(es: Elasticsearch, interval_seconds: int = 30) -> None:
-    print(f"[*] Detection Engine khoi dong")
-    print(f"[*] Chu ky kiem tra: {interval_seconds} giay")
-    print(f"[*] Correlation window: {CORRELATION_WINDOW // 60} phut")
-    print(f"[*] Nhan Ctrl+C de dung\n")
+    import schedule
+
+    logger.info("Detection Engine đã kích hoạt.")
+    logger.info(f"Chu kỳ quét hệ thống: {interval_seconds} giây.")
+    logger.info(f"(Correlation window): {CORRELATION_WINDOW // 60} phút.")
 
     def safe_detection_cycle():
         try:
             run_detection_cycle(es)
         except Exception as e:
-            print(f"\n[ERROR] Detection cycle gap loi, "
-                  f"engine tiep tuc o chu ky sau: {e}")
-    
+            logger.critical(f"Chu kỳ Detection lỗi, tự động khôi phục ở chu kỳ sau: {e}")
+
     schedule.every(interval_seconds).seconds.do(safe_detection_cycle)
+
     safe_detection_cycle()
-    try:
-        while True:
-            schedule.run_pending()
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("\n[*] Detection Engine da dung sach")
+
+    while is_running:
+        schedule.run_pending()
+        time.sleep(1)
+
+    logger.info("Hệ thống đã dừng hoàn toàn.")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="SIEM Detection Engine Core")
+    parser.add_argument("--schedule", action="store_true", help="Chạy hệ thống liên tục định kỳ (Production mode)")
+    parser.add_argument("--interval", type=int, default=30, help="Thời gian lặp lại chu kỳ quét (giây)")
+    args = parser.parse_args()
+
     es = Elasticsearch(ES_HOST)
 
     if not es.ping():
-        print("[ERROR] Khong ket noi duoc Elasticsearch")
-        print(f"[INFO] Kiem tra ES dang chay tai: {ES_HOST}")
+        logger.critical(f"Không thể kết nối tới Elasticsearch tại địa chỉ: {ES_HOST}. Hệ thống dừng lại.")
         sys.exit(1)
 
-    print("[*] Ket noi Elasticsearch thanh cong")
+    logger.info(f"Kết nối thành công tới Elasticsearch: {ES_HOST}")
 
     if not ensure_template_exists(es):
-        print("[ERROR] Khong dam bao duoc index template, dung lai "
-              "de tranh tao index voi mapping sai (source.ip = text).")
+        logger.critical("Index template lỗi hoặc không tồn tại. Dừng hệ thống")
         sys.exit(1)
-    print("[*] Index template OK\n")
 
-    if "--schedule" in sys.argv:
-        run_scheduled(es, interval_seconds=30)
+    logger.info("Kiểm tra cấu trúc Index Template: ĐẠT YÊU CẦU.\n")
+
+    if args.schedule:
+        run_scheduled(es, interval_seconds=args.interval)
     else:
+        logger.info("Chạy hệ thống 1 lần duy nhất.")
         run_once(es)

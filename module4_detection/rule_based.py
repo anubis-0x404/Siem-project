@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from datetime import datetime
+from datetime import datetime, timezone
 from elasticsearch import Elasticsearch
 from config.settings import (
     ES_INDEX_PREFIX,
@@ -19,19 +19,18 @@ def _is_in_cooldown(alert_type: str, src_ip: str) -> bool:
     last_alerted = _rule_cooldown.get(key)
     if last_alerted is None:
         return False
-    elapsed = (datetime.now() - last_alerted).total_seconds()
+    elapsed = (datetime.now(timezone.utc) - last_alerted).total_seconds()
     return elapsed < COOLDOWN_SECONDS
 
 def _set_cooldown(alert_type: str, src_ip: str) -> None:
-    """Ghi nhận thời điểm vừa alert để tính cooldown."""
     key = f"{alert_type}:{src_ip}"
-    _rule_cooldown[key] = datetime.now()
+    _rule_cooldown[key] = datetime.now(timezone.utc)
 
 # Ham tao alert document
 def create_alert(alert_type: str, src_ip: str,
                  severity: str, description: str,
                  extra: dict = None) -> dict:
-    ts = datetime.now()
+    ts = datetime.now(timezone.utc)
     alert = {
         "alert.id": (
             f"{alert_type.lower().replace(' ', '_')}"
@@ -119,12 +118,12 @@ def check_port_scan(es: Elasticsearch, src_ip: str) -> dict | None:
         },
         "aggs": {
             "unique_ports": {
-                "cardinality": {        # ② Đếm unique destination.port
+                "cardinality": {        
                     "field": "destination.port"
                 }
             }
         },
-        "size": 0   # ③ Không cần document, chỉ cần aggregation
+        "size": 0   
     }
 
     try:
@@ -137,7 +136,7 @@ def check_port_scan(es: Elasticsearch, src_ip: str) -> dict | None:
         )
 
         if unique_port_count >= PORT_SCAN_THRESHOLD:
-            _set_cooldown("Port Scan", src_ip)   # ④ Đánh dấu cooldown
+            _set_cooldown("Port Scan", src_ip)   # Đánh dấu cooldown
             return create_alert(
                 alert_type  = "Port Scan",
                 src_ip      = src_ip,
@@ -174,17 +173,58 @@ def run_all_rules(es: Elasticsearch, active_ips: list[str]) -> list[dict]:
 
     return alerts
 
+def get_recent_source_ips(es: Elasticsearch, window_seconds: int) -> list[str]:
+    query = {
+        "query": {
+            "range": {
+                "@timestamp": {
+                    "gte": f"now-{window_seconds}s"
+                }
+            }
+        },
+        "aggs": {
+            "active_ips": {
+                "terms": {
+                    "field": "source.ip",
+                    "size": 100  # Điều chỉnh size tùy thuộc vào lưu lượng log của hệ thống
+                }
+            }
+        },
+        "size": 0
+    }
+    try:
+        res = es.search(index=f"{ES_INDEX_PREFIX}-*", body=query)
+        buckets = res.get("aggregations", {}).get("active_ips", {}).get("buckets", [])
+        return [b["key"] for b in buckets]
+    except Exception as e:
+        print(f"[ERROR] Lỗi khi lấy danh sách IP hoạt động: {e}")
+        return []
+
+
+
 if __name__ == "__main__":
     from config.settings import ES_HOST
-    import json
-    from config.settings import ES_HOST
+    import time
+
     es = Elasticsearch(ES_HOST)
     if not es.ping():
         print("[ERROR] Không kết nối được ES")
         sys.exit(1)
-    test_ips = ["192.168.1.10", "192.168.1.5"]
-    print(f"[*] Kiem tra {len(test_ips)} IP...\n")
-    alerts = run_all_rules(es, test_ips)
-    print(f"\n[+] Tong alert: {len(alerts)}")
-    for a in alerts:
-        print(json.dumps(a, indent=2, ensure_ascii=False))
+
+    CHECK_INTERVAL = 60  # Quét định kỳ mỗi 60 giây
+    MAX_WINDOW = max(BRUTE_FORCE_WINDOW, PORT_SCAN_WINDOW)
+
+    print(f"[*] Hệ thống rule-based bắt đầu chạy (Chu kỳ: {CHECK_INTERVAL}s)...")
+
+    try:
+        while True:
+            active_ips = get_recent_source_ips(es, MAX_WINDOW)
+            
+            if active_ips:
+                run_all_rules(es, active_ips)
+
+            time.sleep(CHECK_INTERVAL)
+
+    except KeyboardInterrupt:
+        print("\n[*] Nhận tín hiệu ngắt. Đang dừng hệ thống...")
+        sys.exit(0)

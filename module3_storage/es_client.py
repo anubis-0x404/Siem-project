@@ -95,17 +95,15 @@ def bulk_index_documents(es: Elasticsearch,
         print(f"[ERROR] Bulk index thất bại: {e}")
         return 0, len(documents)
 
-# ── Nạp log mới phát sinh — gọi LIÊN TỤC mỗi chu kỳ detection ──
-# ── Nạp log mới phát sinh — gọi LIÊN TỤC mỗi chu kỳ detection ──
+
 def ingest_new_logs(es: Elasticsearch) -> int:
     # Đổi import sang các hàm parser cơ bản đang có sẵn
-    from module2_parser.auth_parser     import parse_auth_log
+    from module2_parser.auth_parser     import parse_auth_log_incremental
     from module2_parser.suricata_parser import parse_eve_json
     from module2_parser.normalizer      import normalize
     from config.settings import AUTH_LOG_PATH, EVE_JSON_PATH
 
-    # Sử dụng các hàm cơ bản
-    auth_raw = parse_auth_log(AUTH_LOG_PATH)
+    auth_raw = parse_auth_log_incremental(AUTH_LOG_PATH)
     suri_raw = parse_eve_json(EVE_JSON_PATH)
 
     new_docs = [normalize(r) for r in (auth_raw + suri_raw) if normalize(r)]
@@ -205,7 +203,7 @@ def count_failed_events(es: Elasticsearch,
         return 0
     
 if __name__ == "__main__":
-    from module2_parser.auth_parser     import parse_auth_log
+    from module2_parser.auth_parser     import parse_auth_log_incremental
     from module2_parser.suricata_parser import parse_eve_json
     from module2_parser.normalizer      import normalize
     from config.settings import AUTH_LOG_PATH, EVE_JSON_PATH
@@ -220,7 +218,7 @@ if __name__ == "__main__":
 
     # 2. Parse + normalize auth log
     print("\n[*] Đang xử lý auth.log...")
-    auth_raw  = parse_auth_log(AUTH_LOG_PATH)
+    auth_raw  = parse_auth_log_incremental(AUTH_LOG_PATH)
     auth_docs = [normalize(r) for r in auth_raw if normalize(r)]
 
     # 3. Parse + normalize suricata log

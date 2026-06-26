@@ -1,15 +1,17 @@
 import json
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from config.settings import SEVERITY_MAP, EVE_JSON_PATH
 
 def normalize_timestamp(raw_time: str) -> str:
     try:
-        return raw_time[:19]
+        dt = datetime.fromisoformat(raw_time)
+        dt_utc = dt.astimezone(timezone.utc)
+        return dt_utc.strftime("%Y-%m-%dT%H:%M:%S")
     except Exception:
-        return datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-    
+        return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+
 def parse_line(line: str) -> dict | None:
     original = line              
     line     = line.strip()

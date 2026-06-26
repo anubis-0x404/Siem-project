@@ -1,9 +1,9 @@
 import json
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from config.settings import AUTH_LOG_PATH, EVE_JSON_PATH
-from module2_parser.auth_parser     import parse_auth_log
+from module2_parser.auth_parser     import parse_line
 from module2_parser.suricata_parser import parse_eve_json
 
 EVENT_MAP = {
@@ -39,7 +39,7 @@ def normalize_auth_event(raw: dict) -> dict:
     return {
         # Metadata
         "@timestamp":           raw.get("timestamp",
-                                datetime.now().strftime("%Y-%m-%dT%H:%M:%S")),
+                                datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")),
         "event.kind":           "event",
         "event.category":       meta["category"],
         "event.outcome":        raw.get("outcome", "failure"),
@@ -72,7 +72,7 @@ def normalize_suricata_event(raw: dict) -> dict:
     return {
         # Metadata
         "@timestamp":           raw.get("timestamp",
-                                datetime.now().strftime("%Y-%m-%dT%H:%M:%S")),
+                                datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")),
         "event.kind":           "alert",
         "event.category":       meta["category"],
         "event.outcome":        "unknown",            
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     print("=" * 60)
     print("NORMALIZER — Auth log")
     print("=" * 60)
-    auth_events = parse_auth_log(AUTH_LOG_PATH)
+    auth_events = parse_line(AUTH_LOG_PATH)
     for raw in auth_events:
         normalized = normalize(raw)
         if normalized:
